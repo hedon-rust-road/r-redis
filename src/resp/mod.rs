@@ -59,6 +59,12 @@ impl SimpleError {
     }
 }
 
+impl BulkString {
+    pub fn new(s: impl Into<Vec<u8>>) -> Self {
+        BulkString(s.into())
+    }
+}
+
 impl RespArray {
     pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
         RespArray(s.into())

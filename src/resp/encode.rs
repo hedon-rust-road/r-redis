@@ -212,3 +212,95 @@ impl RespEncode for RespSet {
         buf
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::RespFrame;
+
+    use super::*;
+
+    #[test]
+    fn test_simple_string_encode() {
+        let frame: RespFrame = SimpleString::new("OK".to_string()).into();
+        assert_eq!(frame.encode(), b"+OK\r\n");
+    }
+
+    #[test]
+    fn test_simple_error_encode() {
+        let frame: RespFrame = SimpleError::new("Error Message".to_string()).into();
+        assert_eq!(frame.encode(), b"-Error Message\r\n");
+    }
+
+    #[test]
+    fn test_null_bulk_string_encode() {
+        let frame: RespFrame = RespNullBulkString.into();
+        assert_eq!(frame.encode(), b"$-1\r\n");
+    }
+
+    #[test]
+    fn test_null_array_encode() {
+        let frame: RespFrame = RespNullArray.into();
+        assert_eq!(frame.encode(), b"*-1\r\n");
+    }
+
+    #[test]
+    fn test_null_encode() {
+        let frame: RespFrame = RespNull.into();
+        assert_eq!(frame.encode(), b"_\r\n");
+    }
+
+    #[test]
+    fn test_integer_encode() {
+        let frame: RespFrame = 0.into();
+        assert_eq!(frame.encode(), b":+0\r\n");
+
+        let frame: RespFrame = (-123).into();
+        assert_eq!(frame.encode(), b":-123\r\n");
+
+        let frame: RespFrame = (123).into();
+        assert_eq!(frame.encode(), b":+123\r\n");
+    }
+
+    #[test]
+    fn test_bulk_string_encode() {
+        let frame: RespFrame = BulkString::new(b"hello").into();
+        assert_eq!(frame.encode(), b"$5\r\nhello\r\n");
+    }
+
+    #[test]
+    fn test_array_encode() {
+        let frame: RespFrame = RespArray::new(vec![
+            SimpleString::new("hello").into(),
+            SimpleError::new("Err").into(),
+            123.into(),
+        ])
+        .into();
+        assert_eq!(frame.encode(), b"*3\r\n+hello\r\n-Err\r\n:+123\r\n");
+    }
+
+    #[test]
+    fn test_boolean_encode() {
+        let frame: RespFrame = true.into();
+        assert_eq!(frame.encode(), b"#t\r\n");
+        let frame: RespFrame = false.into();
+        assert_eq!(frame.encode(), b"#f\r\n");
+    }
+
+    /**
+    Double(f64),
+    Map(RespMap),
+    Set(RespSet),
+     */
+
+    #[test]
+    fn test_double_encode() {
+        let frame: RespFrame = (1.22).into();
+        assert_eq!(frame.encode(), b",+1.22\r\n");
+        let frame: RespFrame = (-1.22).into();
+        assert_eq!(frame.encode(), b",-1.22\r\n");
+        let frame: RespFrame = (0.0).into();
+        assert_eq!(frame.encode(), b",0e0\r\n");
+        let frame: RespFrame = (0.00000).into();
+        assert_eq!(frame.encode(), b",0e0\r\n");
+    }
+}
