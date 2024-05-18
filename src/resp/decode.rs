@@ -39,8 +39,8 @@ impl RespDecode for RespFrame {
                 Err(RespError::NotCompleted) => return Err(RespError::NotCompleted),
                 Err(_) => RespArray::decode(buf)?.into(),
             },
-            b'%' => todo!(),
-            b'~' => todo!(),
+            b'%' => RespMap::decode(buf)?.into(),
+            b'~' => RespSet::decode(buf)?.into(),
             _ => {
                 return Err(RespError::InvalidFrameType(format!(
                     "unknown type: {}",
