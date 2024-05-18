@@ -19,7 +19,7 @@ pub trait RespDecode {
 
 /// RESP(Redis serialization protocol specification).
 /// According to https://redis.io/docs/latest/develop/reference/protocol-spec/.
-#[enum_dispatch(RespEncode, Debug, PartialEq, PartialOrd)]
+#[enum_dispatch(RespEncode)]
 pub enum RespFrame {
     SimpleString(SimpleString),
     Error(SimpleError),

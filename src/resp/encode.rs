@@ -189,7 +189,6 @@ impl RespEncode for RespMap {
             buf.extend(SimpleString::new(key).encode());
             buf.extend(&value.encode());
         }
-        println!("{}", String::from_utf8(buf.clone()).unwrap());
         buf
     }
 }
