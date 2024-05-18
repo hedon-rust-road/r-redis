@@ -8,4 +8,7 @@ description = "R-Redis is a redis server implemented in Rust."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.85"
+bytes = "1.6.0"
 enum_dispatch = "0.3.13"
+thiserror = "1.0.61"

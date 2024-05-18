@@ -3,18 +3,23 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
+
+use self::err::RespError;
 
 pub mod decode;
 pub mod encode;
+pub mod err;
 
 #[enum_dispatch]
 pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
 }
 
-pub trait RespDecode {
-    fn decode(buf: Self) -> Result<RespFrame, String>;
+pub trait RespDecode: Sized {
+    const PREFIX: &'static str;
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
 }
 
 /// RESP(Redis serialization protocol specification).
