@@ -259,6 +259,9 @@ impl RespDecode for RespMap {
     const PREFIX: &'static str = "%";
 
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
+        if buf.len() < Self::expect_length(buf)? {
+            return Err(RespError::NotCompleted);
+        }
         let length = parse_length_and_move(Self::PREFIX, buf)?;
         let mut map = RespMap::new();
         for _ in 0..length {
@@ -279,6 +282,9 @@ impl RespDecode for RespSet {
     const PREFIX: &'static str = "~";
 
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
+        if buf.len() < Self::expect_length(buf)? {
+            return Err(RespError::NotCompleted);
+        }
         let length = parse_length_and_move(Self::PREFIX, buf)?;
         let mut data = Vec::with_capacity(length);
         for _ in 0..length {
@@ -385,7 +391,7 @@ fn cal_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result<
             }
             Ok(total)
         }
-        _ => Ok(0),
+        _ => Ok(len + CRLF_LEN),
     }
 }
 
@@ -684,6 +690,19 @@ mod tests {
         expected.insert("foo".to_string(), SimpleString::new("bar").into());
         expected.insert("baz".to_string(), (2).into());
         assert_eq!(result, expected);
+
+        // not completed
+        let mut buf = BytesMut::from("%2\r\n+foo\r\n+bar\r\n");
+        let result = RespMap::decode(&mut buf);
+        assert_eq!(result.unwrap_err(), RespError::NotCompleted);
+
+        // add bytes to buf to make it completed
+        buf.extend_from_slice(b"+baz\r\n+qux\r\n");
+        let result = RespMap::decode(&mut buf)?;
+        let mut expected = RespMap::new();
+        expected.insert("foo".to_string(), SimpleString::new("bar").into());
+        expected.insert("baz".to_string(), SimpleString::new("qux").into());
+        assert_eq!(result, expected);
         Ok(())
     }
 
@@ -722,6 +741,20 @@ mod tests {
         let mut buf = BytesMut::from("~2\r\n+foo\r\n+foo\r\n");
         let result = RespSet::decode(&mut buf)?;
         assert_eq!(result, RespSet::new(vec![SimpleString::new("foo").into()]));
+
+        // not completed
+        let mut buf = BytesMut::from("~2\r\n+foo\r\n");
+        let result = RespSet::decode(&mut buf);
+        assert_eq!(result.unwrap_err(), RespError::NotCompleted);
+
+        // add bytes to buf to make it completed
+        buf.extend_from_slice(b"+baz\r\n");
+        let result = RespSet::decode(&mut buf)?;
+        let expected = RespSet::new(vec![
+            SimpleString::new("foo").into(),
+            SimpleString::new("baz").into(),
+        ]);
+        assert_eq!(result, expected);
         Ok(())
     }
 
