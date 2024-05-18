@@ -7,6 +7,11 @@ use crate::{
 
 const CRLF: &[u8] = b"\r\n";
 const CRLF_LEN: usize = CRLF.len();
+const BOOL_LEN: usize = "#f\r\n".len();
+
+const NULL_BULK_STRING: &[u8] = b"$-1\r\n";
+const NULL: &[u8] = b"_\r\n";
+const NULL_ARRAY: &[u8] = b"*-1\r\n";
 
 /**
 pub enum RespFrame {
@@ -50,60 +55,111 @@ impl RespDecode for RespFrame {
         };
         Ok(res)
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let mut iter = buf.iter().peekable();
+        match iter.peek() {
+            Some(b'*') => RespArray::expect_length(buf),
+            Some(b'~') => RespSet::expect_length(buf),
+            Some(b'%') => RespMap::expect_length(buf),
+            Some(b'#') => bool::expect_length(buf),
+            Some(b':') => i64::expect_length(buf),
+            Some(b',') => f64::expect_length(buf),
+            Some(b'+') => SimpleString::expect_length(buf),
+            Some(b'-') => SimpleError::expect_length(buf),
+            Some(b'_') => RespNull::expect_length(buf),
+            Some(b'$') => {
+                let len = RespNullBulkString::expect_length(buf);
+                if len == Err(RespError::NotCompleted) {
+                    BulkString::expect_length(buf)
+                } else {
+                    len
+                }
+            }
+            _ => Err(RespError::NotCompleted),
+        }
+    }
 }
 
 impl RespDecode for SimpleString {
     const PREFIX: &'static str = "+";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let end = extract_simple_frame_data(buf, Self::PREFIX)?;
         let content = buf.split_to(end + CRLF_LEN);
         let content = String::from_utf8_lossy(&content[Self::PREFIX.len()..end]).to_string();
         Ok(SimpleString::new(content))
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
+        Ok(end + CRLF_LEN)
+    }
 }
 
 impl RespDecode for SimpleError {
     const PREFIX: &'static str = "-";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let end = extract_simple_frame_data(buf, Self::PREFIX)?;
         let content = buf.split_to(end + CRLF_LEN);
         let content = String::from_utf8_lossy(&content[Self::PREFIX.len()..end]).to_string();
         Ok(SimpleError::new(content))
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
+        Ok(end + CRLF_LEN)
+    }
 }
 
 impl RespDecode for RespNullBulkString {
     const PREFIX: &'static str = "$";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        const NULL_BULK_STRING: &[u8] = b"$-1\r\n";
         extract_fixed_data(buf, NULL_BULK_STRING, "RespNullBulkString")?;
         Ok(RespNullBulkString)
+    }
+
+    fn expect_length(_: &[u8]) -> Result<usize, RespError> {
+        Ok(NULL_BULK_STRING.len())
     }
 }
 
 impl RespDecode for RespNull {
     const PREFIX: &'static str = "_";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        const NULL: &[u8] = b"_\r\n";
         extract_fixed_data(buf, NULL, "RespNull")?;
         Ok(RespNull)
+    }
+
+    fn expect_length(_: &[u8]) -> Result<usize, RespError> {
+        Ok(NULL.len())
     }
 }
 
 impl RespDecode for i64 {
     const PREFIX: &'static str = ":";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let end = extract_simple_frame_data(buf, Self::PREFIX)?;
         let content = buf.split_to(end + CRLF_LEN);
         let content = String::from_utf8_lossy(&content[Self::PREFIX.len()..end]).to_string();
         Ok(content.parse::<i64>()?)
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
+        Ok(end + CRLF_LEN)
+    }
 }
 
 impl RespDecode for BulkString {
     const PREFIX: &'static str = "$";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let length = parse_length(Self::PREFIX, buf)?;
+        let length = parse_length_and_move(Self::PREFIX, buf)?;
         if buf.len() < length + CRLF_LEN {
             return Err(RespError::NotCompleted);
         }
@@ -117,10 +173,16 @@ impl RespDecode for BulkString {
         buf.advance(CRLF_LEN);
         Ok(BulkString::new(content))
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let (end, length) = parse_length(Self::PREFIX, buf)?;
+        Ok(end + CRLF_LEN + length + CRLF_LEN)
+    }
 }
 
 impl RespDecode for bool {
     const PREFIX: &'static str = "#";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let end = extract_simple_frame_data(buf, Self::PREFIX)?;
         let content = buf.split_to(end + CRLF_LEN);
@@ -136,45 +198,68 @@ impl RespDecode for bool {
             )))
         }
     }
+
+    fn expect_length(_: &[u8]) -> Result<usize, RespError> {
+        Ok(BOOL_LEN)
+    }
 }
 
 impl RespDecode for f64 {
     const PREFIX: &'static str = ",";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
         let end = extract_simple_frame_data(buf, Self::PREFIX)?;
         let content = buf.split_to(end + CRLF_LEN);
         let content = String::from_utf8_lossy(&content[Self::PREFIX.len()..end]).to_string();
         Ok(content.parse::<f64>()?)
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
+        Ok(end + CRLF_LEN)
+    }
 }
 
 impl RespDecode for RespNullArray {
     const PREFIX: &'static str = "*";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        const NULL_ARRAY: &[u8] = b"*-1\r\n";
         extract_fixed_data(buf, NULL_ARRAY, "RespNullArray")?;
         Ok(RespNullArray)
+    }
+
+    fn expect_length(_: &[u8]) -> Result<usize, RespError> {
+        Ok(NULL_ARRAY.len())
     }
 }
 
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let length = parse_length(Self::PREFIX, buf)?;
+        if buf.len() < Self::expect_length(buf)? {
+            return Err(RespError::NotCompleted);
+        }
+        let length = parse_length_and_move(Self::PREFIX, buf)?;
         let mut array = Vec::with_capacity(length);
         for _ in 0..length {
             let item = RespFrame::decode(buf)?;
-            // TODO:If is not complete, we cannot advance the buf.
             array.push(item);
         }
         Ok(RespArray::new(array))
+    }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let (end, len) = parse_length(Self::PREFIX, buf)?;
+        cal_total_length(buf, end, len, Self::PREFIX)
     }
 }
 
 impl RespDecode for RespMap {
     const PREFIX: &'static str = "%";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let length = parse_length(Self::PREFIX, buf)?;
+        let length = parse_length_and_move(Self::PREFIX, buf)?;
         let mut map = RespMap::new();
         for _ in 0..length {
             let key = SimpleString::decode(buf)?;
@@ -183,12 +268,18 @@ impl RespDecode for RespMap {
         }
         Ok(map)
     }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let (end, len) = parse_length(Self::PREFIX, buf)?;
+        cal_total_length(buf, end, len, Self::PREFIX)
+    }
 }
 
 impl RespDecode for RespSet {
     const PREFIX: &'static str = "~";
+
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let length = parse_length(Self::PREFIX, buf)?;
+        let length = parse_length_and_move(Self::PREFIX, buf)?;
         let mut data = Vec::with_capacity(length);
         for _ in 0..length {
             let key = RespFrame::decode(buf)?;
@@ -198,6 +289,11 @@ impl RespDecode for RespSet {
             data.push(key);
         }
         Ok(RespSet::new(data))
+    }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let (end, len) = parse_length(Self::PREFIX, buf)?;
+        cal_total_length(buf, end, len, Self::PREFIX)
     }
 }
 
@@ -232,23 +328,65 @@ fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespErro
         )));
     }
 
-    if let Some(end) = find_crlf(buf) {
+    if let Some(end) = find_crlf(buf, 1) {
         Ok(end)
     } else {
         Err(RespError::NotCompleted)
     }
 }
 
-fn find_crlf(buf: &[u8]) -> Option<usize> {
-    (1..buf.len() - 1).find(|&i| buf[i] == b'\r' && buf[i + 1] == b'\n')
+/// nth starts from 1.
+fn find_crlf(buf: &[u8], nth: i32) -> Option<usize> {
+    let mut count = nth;
+    (0..buf.len() - 1).find(|&i| {
+        if buf[i] == b'\r' && buf[i + 1] == b'\n' {
+            count -= 1;
+            count == 0
+        } else {
+            false
+        }
+    })
 }
 
-fn parse_length(prefix: &str, buf: &mut BytesMut) -> Result<usize, RespError> {
+fn parse_length(prefix: &str, buf: &[u8]) -> Result<(usize, usize), RespError> {
     let end = extract_simple_frame_data(buf, prefix)?;
-    let length = buf.split_to(end + CRLF_LEN);
-    let length = String::from_utf8_lossy(&length[prefix.len()..end]).to_string();
+    let length = String::from_utf8_lossy(&buf[prefix.len()..end]).to_string();
     let length = length.parse::<usize>()?;
+    Ok((end, length))
+}
+
+fn parse_length_and_move(prefix: &str, buf: &mut BytesMut) -> Result<usize, RespError> {
+    let (end, length) = parse_length(prefix, buf)?;
+    buf.advance(end + CRLF_LEN);
     Ok(length)
+}
+
+fn cal_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result<usize, RespError> {
+    let mut total: usize = end + CRLF_LEN;
+    let mut data = &buf[total..];
+    match prefix {
+        "*" | "~" => {
+            for _ in 0..len {
+                let item_len = RespFrame::expect_length(data)?;
+                data = &data[item_len..];
+                total += item_len;
+            }
+            Ok(total)
+        }
+        "%" => {
+            for _ in 0..len {
+                let key_len = SimpleString::expect_length(data)?;
+                data = &data[key_len..];
+                total += key_len;
+
+                let value_len = RespFrame::expect_length(data)?;
+                data = &data[value_len..];
+                total += value_len;
+            }
+            Ok(total)
+        }
+        _ => Ok(0),
+    }
 }
 
 #[cfg(test)]
@@ -259,6 +397,20 @@ mod tests {
 
     use super::*;
     use crate::{err::RespError, RespDecode};
+
+    #[test]
+    fn test_find_crlf() {
+        let buf = b"+\r\n";
+        assert_eq!(find_crlf(buf, 0), None);
+        assert_eq!(find_crlf(buf, 1), Some(1));
+        assert_eq!(find_crlf(buf, 2), None);
+
+        let buf = b"\r\nxxxx\r\naaa\r\n";
+        assert_eq!(find_crlf(buf, 0), None);
+        assert_eq!(find_crlf(buf, 1), Some(0));
+        assert_eq!(find_crlf(buf, 2), Some(6));
+        assert_eq!(find_crlf(buf, 3), Some(11));
+    }
 
     #[test]
     fn test_simple_string_decode() -> anyhow::Result<()> {
@@ -491,15 +643,15 @@ mod tests {
         assert_eq!(result.unwrap_err(), RespError::NotCompleted);
 
         // add bytes to buf to make it completed
-        // buf.extend_from_slice(b"+bar\r\n");
-        // let result = RespArray::decode(&mut buf)?;
-        // assert_eq!(
-        //     result,
-        //     RespArray::new(vec![
-        //         SimpleString::new("foo").into(),
-        //         SimpleString::new("bar").into()
-        //     ])
-        // );
+        buf.extend_from_slice(b"+bar\r\n");
+        let result = RespArray::decode(&mut buf)?;
+        assert_eq!(
+            result,
+            RespArray::new(vec![
+                SimpleString::new("foo").into(),
+                SimpleString::new("bar").into()
+            ])
+        );
         Ok(())
     }
 
