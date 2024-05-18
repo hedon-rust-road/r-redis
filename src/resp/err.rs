@@ -10,4 +10,8 @@ pub enum RespError {
     InvalidFrameLength(isize),
     #[error("Frame is not completed")]
     NotCompleted,
+    #[error("Parse int error: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Parse float error: {0}")]
+    ParseFloatError(#[from] std::num::ParseFloatError),
 }
