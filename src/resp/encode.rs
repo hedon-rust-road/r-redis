@@ -69,8 +69,7 @@ impl RespEncode for RespNull {
 /// - The CRLF terminator.
 impl RespEncode for i64 {
     fn encode(self) -> Vec<u8> {
-        let sign = if self < 0 { "" } else { "+" };
-        format!(":{}{}\r\n", sign, self).into_bytes()
+        format!(":{}\r\n", self).into_bytes()
     }
 }
 
@@ -152,10 +151,10 @@ impl RespEncode for f64 {
         let ret = if self.abs() > 1e+8 || self.abs() < 1e-8 {
             format!(",{:e}\r\n", self)
         } else {
-            let sign = if self < 0.0 { "" } else { "+" };
+            let sign = if self < 0.0 || self.is_nan() { "" } else { "+" };
             format!(",{}{}\r\n", sign, self)
         };
-
+        let ret = ret.to_lowercase();
         buf.extend_from_slice(&ret.into_bytes());
         buf
     }
@@ -190,6 +189,7 @@ impl RespEncode for RespMap {
             buf.extend(SimpleString::new(key).encode());
             buf.extend(&value.encode());
         }
+        println!("{}", String::from_utf8(buf.clone()).unwrap());
         buf
     }
 }
@@ -215,6 +215,8 @@ impl RespEncode for RespSet {
 
 #[cfg(test)]
 mod tests {
+    use std::f64::{INFINITY, NAN};
+
     use crate::RespFrame;
 
     use super::*;
@@ -223,6 +225,8 @@ mod tests {
     fn test_simple_string_encode() {
         let frame: RespFrame = SimpleString::new("OK".to_string()).into();
         assert_eq!(frame.encode(), b"+OK\r\n");
+        let frame: RespFrame = SimpleString::new("hello".to_string()).into();
+        assert_eq!(frame.encode(), b"+hello\r\n");
     }
 
     #[test]
@@ -252,13 +256,11 @@ mod tests {
     #[test]
     fn test_integer_encode() {
         let frame: RespFrame = 0.into();
-        assert_eq!(frame.encode(), b":+0\r\n");
-
+        assert_eq!(frame.encode(), b":0\r\n");
         let frame: RespFrame = (-123).into();
         assert_eq!(frame.encode(), b":-123\r\n");
-
         let frame: RespFrame = (123).into();
-        assert_eq!(frame.encode(), b":+123\r\n");
+        assert_eq!(frame.encode(), b":123\r\n");
     }
 
     #[test]
@@ -275,7 +277,7 @@ mod tests {
             123.into(),
         ])
         .into();
-        assert_eq!(frame.encode(), b"*3\r\n+hello\r\n-Err\r\n:+123\r\n");
+        assert_eq!(frame.encode(), b"*3\r\n+hello\r\n-Err\r\n:123\r\n");
     }
 
     #[test]
@@ -285,12 +287,6 @@ mod tests {
         let frame: RespFrame = false.into();
         assert_eq!(frame.encode(), b"#f\r\n");
     }
-
-    /**
-    Double(f64),
-    Map(RespMap),
-    Set(RespSet),
-     */
 
     #[test]
     fn test_double_encode() {
@@ -302,5 +298,27 @@ mod tests {
         assert_eq!(frame.encode(), b",0e0\r\n");
         let frame: RespFrame = (0.00000).into();
         assert_eq!(frame.encode(), b",0e0\r\n");
+        let frame: RespFrame = (INFINITY).into();
+        assert_eq!(frame.encode(), b",inf\r\n");
+        let frame: RespFrame = (-INFINITY).into();
+        assert_eq!(frame.encode(), b",-inf\r\n");
+        let frame: RespFrame = (NAN).into();
+        assert_eq!(frame.encode(), b",nan\r\n");
+    }
+
+    #[test]
+    fn test_map_encode() {
+        let mut map = RespMap::new();
+        map.insert("first".to_string(), 1.into());
+        map.insert("second".to_string(), 2.into());
+        let frame: RespFrame = map.into();
+        assert_eq!(frame.encode(), b"%2\r\n+first\r\n:1\r\n+second\r\n:2\r\n");
+    }
+
+    #[test]
+    fn test_set_encode() {
+        let set = RespSet::new(vec![1.into(), 2.into()]);
+        let frame: RespFrame = set.into();
+        assert_eq!(frame.encode(), b"~2\r\n:1\r\n:2\r\n");
     }
 }
