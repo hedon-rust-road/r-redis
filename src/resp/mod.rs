@@ -138,3 +138,45 @@ impl Deref for RespSet {
         &self.0
     }
 }
+
+impl From<&str> for SimpleString {
+    fn from(s: &str) -> Self {
+        SimpleString(s.to_string())
+    }
+}
+
+impl From<&str> for SimpleError {
+    fn from(value: &str) -> Self {
+        SimpleError(value.to_string())
+    }
+}
+
+impl From<&str> for BulkString {
+    fn from(value: &str) -> Self {
+        BulkString(value.as_bytes().to_vec())
+    }
+}
+
+impl From<&[u8]> for BulkString {
+    fn from(value: &[u8]) -> Self {
+        BulkString(value.to_vec())
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for BulkString {
+    fn from(value: &[u8; N]) -> Self {
+        BulkString(value.to_vec())
+    }
+}
+
+impl From<&[u8]> for RespFrame {
+    fn from(value: &[u8]) -> Self {
+        BulkString(value.to_vec()).into()
+    }
+}
+
+impl<const N: usize> From<&[u8; N]> for RespFrame {
+    fn from(value: &[u8; N]) -> Self {
+        BulkString(value.to_vec()).into()
+    }
+}
