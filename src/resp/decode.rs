@@ -164,6 +164,7 @@ impl RespDecode for RespArray {
         let mut array = Vec::with_capacity(length);
         for _ in 0..length {
             let item = RespFrame::decode(buf)?;
+            // TODO:If is not complete, we cannot advance the buf.
             array.push(item);
         }
         Ok(RespArray::new(array))
@@ -231,17 +232,15 @@ fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespErro
         )));
     }
 
-    let mut end = 0;
-    for i in 0..buf.len() - 1 {
-        if buf[i] == b'\r' && buf[i + 1] == b'\n' {
-            end = i;
-            break;
-        }
+    if let Some(end) = find_crlf(buf) {
+        Ok(end)
+    } else {
+        Err(RespError::NotCompleted)
     }
-    if end == 0 {
-        return Err(RespError::NotCompleted);
-    }
-    Ok(end)
+}
+
+fn find_crlf(buf: &[u8]) -> Option<usize> {
+    (1..buf.len() - 1).find(|&i| buf[i] == b'\r' && buf[i + 1] == b'\n')
 }
 
 fn parse_length(prefix: &str, buf: &mut BytesMut) -> Result<usize, RespError> {
@@ -485,6 +484,22 @@ mod tests {
             result,
             RespArray::new(vec![SimpleString::new("foo").into(), (1).into()])
         );
+
+        // not completed
+        let mut buf = BytesMut::from("*2\r\n+foo\r\n");
+        let result = RespArray::decode(&mut buf);
+        assert_eq!(result.unwrap_err(), RespError::NotCompleted);
+
+        // add bytes to buf to make it completed
+        // buf.extend_from_slice(b"+bar\r\n");
+        // let result = RespArray::decode(&mut buf)?;
+        // assert_eq!(
+        //     result,
+        //     RespArray::new(vec![
+        //         SimpleString::new("foo").into(),
+        //         SimpleString::new("bar").into()
+        //     ])
+        // );
         Ok(())
     }
 
