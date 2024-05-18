@@ -13,13 +13,6 @@ const NULL_BULK_STRING: &[u8] = b"$-1\r\n";
 const NULL: &[u8] = b"_\r\n";
 const NULL_ARRAY: &[u8] = b"*-1\r\n";
 
-/**
-pub enum RespFrame {
-    Map(RespMap),
-    Set(RespSet),
-}
- */
-
 impl RespDecode for RespFrame {
     const PREFIX: &'static str = "";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {

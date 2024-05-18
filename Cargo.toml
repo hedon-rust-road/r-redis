@@ -12,3 +12,13 @@ anyhow = "1.0.85"
 bytes = "1.6.0"
 enum_dispatch = "0.3.13"
 thiserror = "1.0.61"
+tokio = { version = "1.37.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "net",
+    "fs",
+    "macros",
+    "io-util",
+] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
