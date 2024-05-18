@@ -297,6 +297,10 @@ mod tests {
         assert_eq!(frame.encode(), b",0e0\r\n");
         let frame: RespFrame = (0.00000).into();
         assert_eq!(frame.encode(), b",0e0\r\n");
+        let frame: RespFrame = (1.22e-10).into();
+        assert_eq!(frame.encode(), b",1.22e-10\r\n");
+        let frame: RespFrame = (1.22e+10).into();
+        assert_eq!(frame.encode(), b",1.22e10\r\n");
         let frame: RespFrame = (INFINITY).into();
         assert_eq!(frame.encode(), b",inf\r\n");
         let frame: RespFrame = (-INFINITY).into();
