@@ -103,10 +103,7 @@ impl RespDecode for i64 {
 impl RespDecode for BulkString {
     const PREFIX: &'static str = "$";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
-        let length = buf.split_to(end + CRLF_LEN);
-        let length = String::from_utf8_lossy(&length[Self::PREFIX.len()..end]).to_string();
-        let length = length.parse::<usize>()?;
+        let length = parse_length(Self::PREFIX, buf)?;
         if buf.len() < length + CRLF_LEN {
             return Err(RespError::NotCompleted);
         }
@@ -163,10 +160,7 @@ impl RespDecode for RespNullArray {
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
-        let length = buf.split_to(end + CRLF_LEN);
-        let length = String::from_utf8_lossy(&length[Self::PREFIX.len()..end]).to_string();
-        let length = length.parse::<usize>()?;
+        let length = parse_length(Self::PREFIX, buf)?;
         let mut array = Vec::with_capacity(length);
         for _ in 0..length {
             let item = RespFrame::decode(buf)?;
@@ -179,10 +173,7 @@ impl RespDecode for RespArray {
 impl RespDecode for RespMap {
     const PREFIX: &'static str = "%";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
-        let length = buf.split_to(end + CRLF_LEN);
-        let length = String::from_utf8_lossy(&length[Self::PREFIX.len()..end]).to_string();
-        let length = length.parse::<usize>()?;
+        let length = parse_length(Self::PREFIX, buf)?;
         let mut map = RespMap::new();
         for _ in 0..length {
             let key = SimpleString::decode(buf)?;
@@ -196,10 +187,7 @@ impl RespDecode for RespMap {
 impl RespDecode for RespSet {
     const PREFIX: &'static str = "~";
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
-        let end = extract_simple_frame_data(buf, Self::PREFIX)?;
-        let length = buf.split_to(end + CRLF_LEN);
-        let length = String::from_utf8_lossy(&length[Self::PREFIX.len()..end]).to_string();
-        let length = length.parse::<usize>()?;
+        let length = parse_length(Self::PREFIX, buf)?;
         let mut data = Vec::with_capacity(length);
         for _ in 0..length {
             let key = RespFrame::decode(buf)?;
@@ -254,6 +242,14 @@ fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespErro
         return Err(RespError::NotCompleted);
     }
     Ok(end)
+}
+
+fn parse_length(prefix: &str, buf: &mut BytesMut) -> Result<usize, RespError> {
+    let end = extract_simple_frame_data(buf, prefix)?;
+    let length = buf.split_to(end + CRLF_LEN);
+    let length = String::from_utf8_lossy(&length[prefix.len()..end]).to_string();
+    let length = length.parse::<usize>()?;
+    Ok(length)
 }
 
 #[cfg(test)]
