@@ -10,6 +10,7 @@ description = "R-Redis is a redis server implemented in Rust."
 [dependencies]
 anyhow = "1.0.85"
 bytes = "1.6.0"
+clap = { version = "4.5.4", features = ["derive"] }
 enum_dispatch = "0.3.13"
 thiserror = "1.0.61"
 tokio = { version = "1.37.0", features = [

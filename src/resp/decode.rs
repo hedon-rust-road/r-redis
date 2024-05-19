@@ -1,8 +1,8 @@
 use bytes::{Buf, BytesMut};
 
 use crate::{
-    err::RespError, BulkString, RespArray, RespDecode, RespFrame, RespMap, RespNull, RespNullArray,
-    RespNullBulkString, RespSet, SimpleError, SimpleString,
+    resp::err::RespError, BulkString, RespArray, RespDecode, RespFrame, RespMap, RespNull,
+    RespNullArray, RespNullBulkString, RespSet, SimpleError, SimpleString,
 };
 
 const CRLF: &[u8] = b"\r\n";
@@ -62,11 +62,10 @@ impl RespDecode for RespFrame {
             Some(b'-') => SimpleError::expect_length(buf),
             Some(b'_') => RespNull::expect_length(buf),
             Some(b'$') => {
-                let len = RespNullBulkString::expect_length(buf);
-                if len == Err(RespError::NotCompleted) {
-                    BulkString::expect_length(buf)
+                if buf.len() >= 2 && buf[1] == b'-' {
+                    RespNullBulkString::expect_length(buf)
                 } else {
-                    len
+                    BulkString::expect_length(buf)
                 }
             }
             _ => Err(RespError::NotCompleted),
@@ -350,7 +349,7 @@ fn find_crlf(buf: &[u8], nth: i32) -> Option<usize> {
 fn parse_length(prefix: &str, buf: &[u8]) -> Result<(usize, usize), RespError> {
     let end = extract_simple_frame_data(buf, prefix)?;
     let length = String::from_utf8_lossy(&buf[prefix.len()..end]).to_string();
-    let length = length.parse::<usize>()?;
+    let length = length.parse()?;
     Ok((end, length))
 }
 
@@ -395,7 +394,7 @@ mod tests {
     use bytes::BufMut;
 
     use super::*;
-    use crate::{err::RespError, RespDecode};
+    use crate::{resp::err::RespError, RespDecode};
 
     #[test]
     fn test_find_crlf() {
@@ -751,5 +750,29 @@ mod tests {
         Ok(())
     }
 
-    // one item}
+    #[test]
+    fn test_resp_frame_decode() -> anyhow::Result<()> {
+        let mut buf = BytesMut::from("$-1\r\n");
+        let result = RespFrame::decode(&mut buf)?;
+        assert_eq!(result, RespFrame::NullBulkString(RespNullBulkString));
+
+        let mut buf = BytesMut::from("$5\r\nhello\r\n");
+        let expected_length = RespFrame::expect_length(&buf)?;
+        assert_eq!(expected_length, 11);
+        let result = RespFrame::decode(&mut buf)?;
+        assert_eq!(result, RespFrame::BulkString(b"hello".into()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_bulk_string_expect_length() -> anyhow::Result<()> {
+        let buf = BytesMut::from("$-1\r\n");
+        let len = RespFrame::expect_length(&buf)?;
+        assert_eq!(len, 5);
+
+        let buf = BytesMut::from("$2\r\nhi\r\n");
+        let len = RespFrame::expect_length(&buf)?;
+        assert_eq!(len, 8);
+        Ok(())
+    }
 }

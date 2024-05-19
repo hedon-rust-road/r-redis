@@ -55,9 +55,9 @@ pub struct RespNullArray;
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
 pub struct RespNull;
 #[derive(Debug, PartialEq, PartialOrd)]
-pub struct RespArray(Vec<RespFrame>);
+pub struct RespArray(pub(crate) Vec<RespFrame>);
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(Vec<u8>);
+pub struct BulkString(pub(crate) Vec<u8>);
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct RespMap(BTreeMap<String, RespFrame>);
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -178,5 +178,17 @@ impl From<&[u8]> for RespFrame {
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(value: &[u8; N]) -> Self {
         BulkString(value.to_vec()).into()
+    }
+}
+
+impl AsRef<[u8]> for BulkString {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<str> for SimpleString {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
