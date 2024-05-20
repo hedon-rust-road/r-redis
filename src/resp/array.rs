@@ -3,15 +3,14 @@ use std::ops::Deref;
 use bytes::BytesMut;
 
 use crate::{
-    decode::{cal_total_length, parse_length, parse_length_and_move},
-    encode::BUF_CAP,
-    err::RespError,
-    resp_frame::RespFrame,
-    RespDecode, RespEncode,
+    cal_total_length, err::RespError, parse_length, parse_length_and_move, resp_frame::RespFrame,
+    RespDecode, RespEncode, BUF_CAP,
 };
 
+pub const NULL_ARRAY: &[u8] = b"*-1\r\n";
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespArray(pub(crate) Vec<RespFrame>);
+pub struct RespArray(pub(crate) bool, pub(crate) Vec<RespFrame>);
 
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
@@ -21,7 +20,10 @@ impl RespDecode for RespArray {
             return Err(RespError::NotCompleted);
         }
         let length = parse_length_and_move(Self::PREFIX, buf)?;
-        let mut array = Vec::with_capacity(length);
+        if length == -1 {
+            return Ok(RespArray::new_null());
+        }
+        let mut array = Vec::with_capacity(length as usize);
         for _ in 0..length {
             let item = RespFrame::decode(buf)?;
             array.push(item);
@@ -31,7 +33,10 @@ impl RespDecode for RespArray {
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
         let (end, len) = parse_length(Self::PREFIX, buf)?;
-        cal_total_length(buf, end, len, Self::PREFIX)
+        if len == -1 {
+            return Ok(NULL_ARRAY.len());
+        }
+        cal_total_length(buf, end, len as usize, Self::PREFIX)
     }
 }
 
@@ -48,9 +53,12 @@ impl RespDecode for RespArray {
 /// - An additional RESP type for every element of the array.
 impl RespEncode for RespArray {
     fn encode(self) -> Vec<u8> {
+        if self.0 {
+            return NULL_ARRAY.to_vec();
+        }
         let mut buf = Vec::with_capacity(BUF_CAP);
         buf.extend_from_slice(format!("*{}\r\n", self.len()).as_bytes());
-        for frame in self.0 {
+        for frame in self.1 {
             buf.extend_from_slice(&frame.encode())
         }
         buf
@@ -59,14 +67,17 @@ impl RespEncode for RespArray {
 
 impl RespArray {
     pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
-        RespArray(s.into())
+        RespArray(false, s.into())
+    }
+    pub fn new_null() -> Self {
+        RespArray(true, vec![])
     }
 }
 
 impl Deref for RespArray {
     type Target = Vec<RespFrame>;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.1
     }
 }
 
@@ -125,6 +136,11 @@ mod tests {
                 SimpleString::new("bar").into()
             ])
         );
+
+        // null array
+        let mut buf = BytesMut::from("*-1\r\n");
+        let result = RespArray::decode(&mut buf)?;
+        assert_eq!(result, RespArray::new_null());
         Ok(())
     }
 
@@ -137,5 +153,8 @@ mod tests {
         ])
         .into();
         assert_eq!(frame.encode(), b"*3\r\n+hello\r\n-Err\r\n:123\r\n");
+
+        let frame: RespFrame = RespArray::new_null().into();
+        assert_eq!(frame.encode(), b"*-1\r\n");
     }
 }

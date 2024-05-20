@@ -3,11 +3,8 @@ use std::ops::Deref;
 use bytes::BytesMut;
 
 use crate::{
-    decode::{cal_total_length, parse_length, parse_length_and_move},
-    encode::BUF_CAP,
-    err::RespError,
-    resp_frame::RespFrame,
-    RespDecode, RespEncode,
+    cal_total_length, err::RespError, parse_length, parse_length_and_move, resp_frame::RespFrame,
+    RespDecode, RespEncode, BUF_CAP,
 };
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -40,7 +37,7 @@ impl RespDecode for RespSet {
             return Err(RespError::NotCompleted);
         }
         let length = parse_length_and_move(Self::PREFIX, buf)?;
-        let mut data = Vec::with_capacity(length);
+        let mut data = Vec::with_capacity(length as usize);
         for _ in 0..length {
             let key = RespFrame::decode(buf)?;
             if data.contains(&key) {
@@ -53,7 +50,7 @@ impl RespDecode for RespSet {
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
         let (end, len) = parse_length(Self::PREFIX, buf)?;
-        cal_total_length(buf, end, len, Self::PREFIX)
+        cal_total_length(buf, end, len as usize, Self::PREFIX)
     }
 }
 

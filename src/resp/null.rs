@@ -1,10 +1,8 @@
 use bytes::BytesMut;
 
-use crate::{
-    decode::{extract_fixed_data, NULL},
-    err::RespError,
-    RespDecode, RespEncode,
-};
+use crate::{err::RespError, extract_fixed_data, RespDecode, RespEncode};
+
+pub const NULL: &[u8] = b"_\r\n";
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNull;

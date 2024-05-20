@@ -1,10 +1,6 @@
 use bytes::BytesMut;
 
-use crate::{
-    decode::{extract_simple_frame_data, CRLF_LEN},
-    err::RespError,
-    RespDecode, RespEncode,
-};
+use crate::{err::RespError, extract_simple_frame_data, RespDecode, RespEncode, CRLF_LEN};
 
 /// This type is a CRLF-terminated string that represents a signed, base-10, 64-bit integer.
 ///

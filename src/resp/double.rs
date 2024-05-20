@@ -1,10 +1,6 @@
 use bytes::BytesMut;
 
-use crate::{
-    decode::{extract_simple_frame_data, CRLF_LEN},
-    err::RespError,
-    RespDecode, RespEncode,
-};
+use crate::{err::RespError, extract_simple_frame_data, RespDecode, RespEncode, CRLF_LEN};
 
 /// The Double RESP type encodes a double-precision floating point value.
 /// Format:

@@ -1,11 +1,12 @@
-#![allow(dead_code)]
+pub mod err;
 pub mod hmap;
 pub mod map;
 
 use enum_dispatch::enum_dispatch;
-use thiserror::Error;
 
-use crate::{backend, resp::err::RespError, RespArray, RespFrame, SimpleString};
+use crate::{backend, RespArray, RespFrame, SimpleString};
+
+use self::err::CommandError;
 
 lazy_static::lazy_static! {
     static ref RESP_OK:RespFrame = SimpleString::new("OK").into();
@@ -52,19 +53,6 @@ pub struct HSet {
 #[derive(Debug)]
 pub struct HGetAll {
     key: String,
-}
-
-#[derive(Debug, Error)]
-pub enum CommandError {
-    #[error("Invalid command: {0}")]
-    InvalidCommand(String),
-    #[error("Invalid argument: {0}")]
-    InvalidArgument(String),
-
-    #[error("{0}")]
-    RespError(#[from] RespError),
-    #[error("Utf8 error: {0}")]
-    Utf8Error(#[from] std::string::FromUtf8Error),
 }
 
 impl TryFrom<RespFrame> for Command {
@@ -136,7 +124,7 @@ fn validate_command(
 }
 
 fn extract_args(value: RespArray, start: usize) -> anyhow::Result<Vec<RespFrame>, CommandError> {
-    Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
+    Ok(value.1.into_iter().skip(start).collect::<Vec<RespFrame>>())
 }
 
 #[cfg(test)]

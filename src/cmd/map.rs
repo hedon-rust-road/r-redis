@@ -47,7 +47,7 @@ impl TryFrom<RespArray> for Set {
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
             (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(value))) => Ok(Set {
-                key: String::from_utf8(key.0).map_err(CommandError::Utf8Error)?,
+                key: String::from_utf8(key.1).map_err(CommandError::Utf8Error)?,
                 value: value.into(),
             }),
             _ => Err(CommandError::InvalidArgument(
