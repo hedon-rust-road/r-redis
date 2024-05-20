@@ -5,17 +5,19 @@ use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use crate::{err::RespError, Backend, Command, CommandExecutor, RespDecode, RespEncode, RespFrame};
+use crate::{
+    cmd::{Command, CommandExecutor},
+    err::RespError,
+    Backend, RespDecode, RespEncode, RespFrame,
+};
 
 struct RespFrameCodec;
 
-#[derive(Debug)]
 struct RedisRequest {
     frame: RespFrame,
     backend: Backend,
 }
 
-#[derive(Debug)]
 struct RedisResponse {
     frame: RespFrame,
 }
