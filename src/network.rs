@@ -1,54 +1,75 @@
 use anyhow::anyhow;
 use bytes::BytesMut;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use futures::SinkExt;
+use tokio::net::TcpStream;
+use tokio_stream::StreamExt;
+use tokio_util::codec::{Decoder, Encoder, Framed};
 
-use crate::{
-    err::RespError, Backend, Command, CommandExecutor, RespDecode, RespEncode, RespFrame,
-    SimpleError,
-};
+use crate::{err::RespError, Backend, Command, CommandExecutor, RespDecode, RespEncode, RespFrame};
 
-pub async fn handle_stream(mut stream: TcpStream, backend: Backend) -> anyhow::Result<()> {
-    let mut buf = BytesMut::with_capacity(4096);
+struct RespFrameCodec;
+
+#[derive(Debug)]
+struct RedisRequest {
+    frame: RespFrame,
+    backend: Backend,
+}
+
+#[derive(Debug)]
+struct RedisResponse {
+    frame: RespFrame,
+}
+
+impl Encoder<RespFrame> for RespFrameCodec {
+    type Error = anyhow::Error;
+    fn encode(&mut self, item: RespFrame, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let bs = item.encode();
+        dst.extend_from_slice(bs.as_slice());
+        Ok(())
+    }
+}
+
+impl Decoder for RespFrameCodec {
+    type Error = anyhow::Error;
+    type Item = RespFrame;
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<RespFrame>, Self::Error> {
+        let res = RespFrame::decode(src);
+        match res {
+            Err(RespError::NotCompleted) => Ok(None),
+            Ok(frame) => Ok(Some(frame)),
+            Err(e) => Ok(Some(RespFrame::Error(e.to_string().into()))),
+        }
+    }
+}
+
+pub async fn handle_stream(stream: TcpStream, backend: Backend) -> anyhow::Result<()> {
+    let mut framed = Framed::new(stream, RespFrameCodec);
 
     loop {
-        let n = stream.read_buf(&mut buf).await?;
-        if n == 0 {
-            return Err(anyhow!("connection closed"));
-        }
-
-        let res = RespFrame::decode(&mut buf);
-        match res {
-            Err(RespError::NotCompleted) => {
-                continue;
-            }
-            Ok(frame) => {
-                match handle_frame(frame, &mut stream, &backend).await {
-                    Ok(_) => continue,
-                    Err(e) => {
-                        let e = SimpleError::new(e.to_string());
-                        stream.write_all(e.encode().as_slice()).await?
-                    }
+        match framed.next().await {
+            None => return Err(anyhow!("connection closed")),
+            Some(Err(e)) => return Err(anyhow!(e.to_string())),
+            Some(Ok(frame)) => {
+                let req = RedisRequest {
+                    frame,
+                    backend: backend.clone(),
                 };
-            }
-            Err(e) => {
-                let e = SimpleError::new(e.to_string());
-                stream.write_all(e.encode().as_slice()).await?
+                let resp = handle_request(req).await?;
+                framed.send(resp.frame).await?;
             }
         }
     }
 }
 
-async fn handle_frame(
-    frame: RespFrame,
-    stream: &mut TcpStream,
-    backend: &Backend,
-) -> anyhow::Result<()> {
-    let cmd: Command = frame.try_into()?;
-    let res = cmd.execute(backend);
-    let res = res.encode();
-    stream.write_all(res.as_slice()).await?;
-    Ok(())
+async fn handle_request(req: RedisRequest) -> anyhow::Result<RedisResponse> {
+    let (frame, backend) = (req.frame, req.backend);
+    match TryInto::<Command>::try_into(frame) {
+        Ok(cmd) => {
+            let res = cmd.execute(&backend);
+            Ok(RedisResponse { frame: res })
+        }
+        Err(e) => Ok(RedisResponse {
+            frame: RespFrame::Error(e.to_string().into()),
+        }),
+    }
 }

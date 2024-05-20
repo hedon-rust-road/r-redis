@@ -151,6 +151,12 @@ impl From<&str> for SimpleError {
     }
 }
 
+impl From<String> for SimpleError {
+    fn from(value: String) -> Self {
+        SimpleError(value)
+    }
+}
+
 impl From<&str> for BulkString {
     fn from(value: &str) -> Self {
         BulkString(value.as_bytes().to_vec())
