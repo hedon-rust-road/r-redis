@@ -430,6 +430,7 @@ dependencies = [
  "clap",
  "dashmap",
  "enum_dispatch",
+ "lazy_static",
  "thiserror",
  "tokio",
  "tracing",

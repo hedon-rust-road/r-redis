@@ -1,22 +1,37 @@
-use crate::{CommandError, CommandExecutor, HGet, HGetAll, HSet, RespArray, RespFrame};
+use crate::{
+    Backend, CommandError, CommandExecutor, HGet, HGetAll, HSet, RespArray, RespFrame, RespMap,
+    RespNull,
+};
 
-use super::{extract_args, validate_command};
+use super::{extract_args, validate_command, RESP_OK};
 
 impl CommandExecutor for HGet {
-    fn execute(self) -> crate::RespFrame {
-        todo!()
+    fn execute(self, backend: &Backend) -> crate::RespFrame {
+        let res = backend.hget(&self.key, &self.field);
+        match res {
+            Some(value) => value,
+            None => RespFrame::Null(RespNull),
+        }
     }
 }
 
 impl CommandExecutor for HSet {
-    fn execute(self) -> crate::RespFrame {
-        todo!()
+    fn execute(self, backend: &Backend) -> crate::RespFrame {
+        backend.hset(self.key, self.field, self.value);
+        RESP_OK.clone()
     }
 }
 
 impl CommandExecutor for HGetAll {
-    fn execute(self) -> crate::RespFrame {
-        todo!()
+    fn execute(self, backend: &Backend) -> crate::RespFrame {
+        let res = backend.hgetall(&self.key);
+        let mut m = RespMap::new();
+        if let Some(map) = res {
+            for (k, v) in map {
+                m.insert(k, v);
+            }
+        }
+        m.into()
     }
 }
 

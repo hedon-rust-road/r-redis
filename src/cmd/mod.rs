@@ -5,11 +5,15 @@ pub mod map;
 use enum_dispatch::enum_dispatch;
 use thiserror::Error;
 
-use crate::{resp::err::RespError, RespArray, RespFrame};
+use crate::{backend, resp::err::RespError, RespArray, RespFrame, SimpleString};
+
+lazy_static::lazy_static! {
+    static ref RESP_OK:RespFrame = SimpleString::new("OK").into();
+}
 
 #[enum_dispatch]
 pub trait CommandExecutor {
-    fn execute(self) -> RespFrame;
+    fn execute(self, backend: &backend::Backend) -> RespFrame;
 }
 
 #[enum_dispatch(CommandExecutor)]

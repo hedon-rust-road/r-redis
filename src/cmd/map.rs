@@ -1,16 +1,21 @@
-use crate::{CommandError, CommandExecutor, Get, RespArray, RespFrame, Set};
+use crate::{Backend, CommandError, CommandExecutor, Get, RespArray, RespFrame, RespNull, Set};
 
-use super::{extract_args, validate_command};
+use super::{extract_args, validate_command, RESP_OK};
 
 impl CommandExecutor for Get {
-    fn execute(self) -> RespFrame {
-        todo!()
+    fn execute(self, backend: &Backend) -> RespFrame {
+        let res = backend.get(&self.key);
+        match res {
+            Some(value) => value,
+            None => RespFrame::Null(RespNull),
+        }
     }
 }
 
 impl CommandExecutor for Set {
-    fn execute(self) -> RespFrame {
-        todo!()
+    fn execute(self, backend: &Backend) -> RespFrame {
+        backend.set(self.key, self.value);
+        RESP_OK.clone()
     }
 }
 
@@ -136,6 +141,11 @@ mod tests {
             result.unwrap_err().to_string(),
             "Invalid argument: length of set command arguments must be 2".to_string()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_execute_get() -> anyhow::Result<()> {
         Ok(())
     }
 }
