@@ -22,10 +22,10 @@ impl TryFrom<RespArray> for SAdd {
         match (args.next(), args.next()) {
             (
                 Some(RespFrame::BulkString(BulkString(Some(key)))),
-                Some(RespFrame::BulkString(BulkString(Some(field)))),
+                Some(RespFrame::BulkString(member)),
             ) => Ok(SAdd {
                 key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
-                member: String::from_utf8(field).map_err(CommandError::Utf8Error)?,
+                member,
             }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid arguments for sadd".into(),
@@ -42,10 +42,10 @@ impl TryFrom<RespArray> for SIsMember {
         match (args.next(), args.next()) {
             (
                 Some(RespFrame::BulkString(BulkString(Some(key)))),
-                Some(RespFrame::BulkString(BulkString(Some(field)))),
+                Some(RespFrame::BulkString(member)),
             ) => Ok(SIsMember {
                 key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
-                member: String::from_utf8(field).map_err(CommandError::Utf8Error)?,
+                member,
             }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid arguments for sismember".into(),

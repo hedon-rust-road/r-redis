@@ -1,8 +1,8 @@
 use std::{ops::Deref, sync::Arc};
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 
-use crate::RespFrame;
+use crate::{BulkString, RespFrame};
 
 #[derive(Debug, Clone)]
 pub struct Backend(Arc<BackendInner>);
@@ -11,7 +11,7 @@ pub struct Backend(Arc<BackendInner>);
 pub struct BackendInner {
     pub(crate) map: DashMap<String, RespFrame>,
     pub(crate) hmap: DashMap<String, DashMap<String, RespFrame>>,
-    pub(crate) set: DashMap<String, DashMap<String, ()>>,
+    pub(crate) set: DashMap<String, DashSet<BulkString>>,
 }
 
 impl Deref for Backend {
@@ -77,18 +77,21 @@ impl Backend {
         map
     }
 
-    pub fn sadd(&self, key: String, member: String) -> i64 {
+    pub fn sadd(&self, key: String, member: BulkString) -> i64 {
         let set = self.set.entry(key).or_default();
-        match set.insert(member, ()) {
-            Some(()) => 1,
-            None => 0,
+        if set.insert(member) {
+            0
+        } else {
+            1
         }
     }
 
-    pub fn is_member(&self, key: String, member: String) -> i64 {
+    pub fn is_member(&self, key: String, member: BulkString) -> i64 {
         if let Some(set) = self.set.get(&key) {
-            if set.get(&member).is_some() {
+            if set.contains(&member) {
                 return 1;
+            } else {
+                return 0;
             }
         }
         0

@@ -75,13 +75,13 @@ pub struct Echo {
 #[derive(Debug)]
 pub struct SAdd {
     key: String,
-    member: String,
+    member: BulkString,
 }
 
 #[derive(Debug)]
 pub struct SIsMember {
     key: String,
-    member: String,
+    member: BulkString,
 }
 
 impl TryFrom<RespFrame> for Command {

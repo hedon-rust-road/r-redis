@@ -8,7 +8,7 @@ use crate::{
 
 pub const NULL_BULK_STRING: &[u8] = b"$-1\r\n";
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub struct BulkString(pub(crate) Option<Vec<u8>>);
 
 /// A bulk string represents a single binary string.
