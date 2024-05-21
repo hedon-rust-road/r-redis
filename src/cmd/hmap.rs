@@ -1,7 +1,8 @@
 use crate::{Backend, RespArray, RespFrame, RespMap, RespNull};
 
 use super::{
-    extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HSet, RESP_OK,
+    extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HMGet, HSet,
+    RESP_OK,
 };
 
 impl CommandExecutor for HGet {
@@ -31,6 +32,17 @@ impl CommandExecutor for HGetAll {
             }
         }
         m.into()
+    }
+}
+
+impl CommandExecutor for HMGet {
+    fn execute(self, backend: &crate::backend::Backend) -> RespFrame {
+        let m = backend.hmget(&self.key, &self.fields);
+        let mut res = RespMap::new();
+        for (k, v) in m {
+            res.insert(k, v);
+        }
+        res.into()
     }
 }
 
@@ -87,6 +99,50 @@ impl TryFrom<RespArray> for HGetAll {
             }),
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
         }
+    }
+}
+
+impl TryFrom<RespArray> for HMGet {
+    type Error = CommandError;
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        if value.len() < 3 {
+            return Err(CommandError::InvalidArgument(
+                "wrong number of arguments for 'hmget' command".to_string(),
+            ));
+        }
+
+        validate_command(&value, "hmget", value.len() - 1)?;
+
+        let mut args = extract_args(value, 1)?.into_iter();
+        let key = match args.next() {
+            Some(RespFrame::BulkString(key)) => {
+                String::from_utf8(key.1).map_err(CommandError::Utf8Error)?
+            }
+            _ => {
+                return Err(CommandError::InvalidArgument(
+                    "Invalid of lack of key".to_string(),
+                ))
+            }
+        };
+
+        let mut res = HMGet {
+            key,
+            fields: Vec::new(),
+        };
+
+        for arg in args {
+            match arg {
+                RespFrame::BulkString(field) => res
+                    .fields
+                    .push(String::from_utf8(field.1).map_err(CommandError::Utf8Error)?),
+                _ => {
+                    return Err(CommandError::InvalidArgument(
+                        "Invalid of lack of field".to_string(),
+                    ))
+                }
+            }
+        }
+        Ok(res)
     }
 }
 

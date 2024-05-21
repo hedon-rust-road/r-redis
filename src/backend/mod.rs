@@ -62,4 +62,16 @@ impl Backend {
     pub fn hgetall(&self, key: &str) -> Option<DashMap<String, RespFrame>> {
         self.hmap.get(key).map(|v| v.clone())
     }
+
+    pub fn hmget(&self, key: &str, fields: &[String]) -> DashMap<String, RespFrame> {
+        let map = DashMap::new();
+        if let Some(v) = self.hmap.get(key) {
+            for field in fields {
+                if let Some(v) = v.get(field) {
+                    map.insert(field.clone(), v.value().clone());
+                }
+            }
+        }
+        map
+    }
 }
