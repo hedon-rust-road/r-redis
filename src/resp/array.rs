@@ -10,7 +10,7 @@ use crate::{
 pub const NULL_ARRAY: &[u8] = b"*-1\r\n";
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespArray(pub(crate) bool, pub(crate) Vec<RespFrame>);
+pub struct RespArray(pub(crate) Option<Vec<RespFrame>>);
 
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
@@ -21,7 +21,7 @@ impl RespDecode for RespArray {
         }
         let length = parse_length_and_move(Self::PREFIX, buf)?;
         if length == -1 {
-            return Ok(RespArray::new_null());
+            return Ok(RespArray::null());
         }
         let mut array = Vec::with_capacity(length as usize);
         for _ in 0..length {
@@ -53,31 +53,34 @@ impl RespDecode for RespArray {
 /// - An additional RESP type for every element of the array.
 impl RespEncode for RespArray {
     fn encode(self) -> Vec<u8> {
-        if self.0 {
-            return NULL_ARRAY.to_vec();
+        match self.0 {
+            None => NULL_ARRAY.to_vec(),
+            Some(v) => {
+                let mut buf = Vec::with_capacity(BUF_CAP);
+                buf.extend_from_slice(format!("*{}\r\n", v.len()).as_bytes());
+                for frame in v {
+                    buf.extend_from_slice(&frame.encode())
+                }
+                buf
+            }
         }
-        let mut buf = Vec::with_capacity(BUF_CAP);
-        buf.extend_from_slice(format!("*{}\r\n", self.len()).as_bytes());
-        for frame in self.1 {
-            buf.extend_from_slice(&frame.encode())
-        }
-        buf
     }
 }
 
 impl RespArray {
     pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
-        RespArray(false, s.into())
+        RespArray(Some(s.into()))
     }
-    pub fn new_null() -> Self {
-        RespArray(true, vec![])
+    pub fn null() -> Self {
+        RespArray(None)
     }
 }
 
 impl Deref for RespArray {
     type Target = Vec<RespFrame>;
     fn deref(&self) -> &Self::Target {
-        &self.1
+        static EMPTY_ARRAY: Vec<RespFrame> = vec![];
+        self.0.as_ref().unwrap_or(&EMPTY_ARRAY)
     }
 }
 
@@ -140,7 +143,7 @@ mod tests {
         // null array
         let mut buf = BytesMut::from("*-1\r\n");
         let result = RespArray::decode(&mut buf)?;
-        assert_eq!(result, RespArray::new_null());
+        assert_eq!(result, RespArray::null());
         Ok(())
     }
 
@@ -154,7 +157,7 @@ mod tests {
         .into();
         assert_eq!(frame.encode(), b"*3\r\n+hello\r\n-Err\r\n:123\r\n");
 
-        let frame: RespFrame = RespArray::new_null().into();
+        let frame: RespFrame = RespArray::null().into();
         assert_eq!(frame.encode(), b"*-1\r\n");
     }
 }

@@ -157,7 +157,12 @@ fn validate_command(
 }
 
 fn extract_args(value: RespArray, start: usize) -> anyhow::Result<Vec<RespFrame>, CommandError> {
-    Ok(value.1.into_iter().skip(start).collect::<Vec<RespFrame>>())
+    match value.0 {
+        None => Err(CommandError::InvalidArgument(
+            "Command must have arguments".to_string(),
+        )),
+        Some(value) => Ok(value.into_iter().skip(start).collect::<Vec<RespFrame>>()),
+    }
 }
 
 #[cfg(test)]
