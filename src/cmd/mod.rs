@@ -1,3 +1,4 @@
+pub mod echo;
 pub mod err;
 pub mod hmap;
 pub mod map;
@@ -25,6 +26,7 @@ pub enum Command {
     HSet(HSet),
     HGetAll(HGetAll),
     HMGet(HMGet),
+    Echo(Echo),
 }
 
 #[derive(Debug)]
@@ -62,6 +64,11 @@ pub struct HMGet {
     fields: Vec<String>,
 }
 
+#[derive(Debug)]
+pub struct Echo {
+    message: String,
+}
+
 impl TryFrom<RespFrame> for Command {
     type Error = CommandError;
 
@@ -87,6 +94,7 @@ impl TryFrom<RespArray> for Command {
                 b"hset" => Ok(HSet::try_from(value)?.into()),
                 b"hgetall" => Ok(HGetAll::try_from(value)?.into()),
                 b"hmget" => Ok(HMGet::try_from(value)?.into()),
+                b"echo" => Ok(Echo::try_from(value)?.into()),
                 _ => Err(CommandError::InvalidCommand(format!(
                     "Invalid command: {}",
                     String::from_utf8_lossy(c.as_ref())
