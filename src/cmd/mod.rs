@@ -29,6 +29,7 @@ pub enum Command {
     HMGet(HMGet),
     Echo(Echo),
     SAdd(SAdd),
+    SIsMember(SIsMember),
 }
 
 #[derive(Debug)]
@@ -74,7 +75,13 @@ pub struct Echo {
 #[derive(Debug)]
 pub struct SAdd {
     key: String,
-    field: String,
+    member: String,
+}
+
+#[derive(Debug)]
+pub struct SIsMember {
+    key: String,
+    member: String,
 }
 
 impl TryFrom<RespFrame> for Command {
@@ -104,6 +111,7 @@ impl TryFrom<RespArray> for Command {
                 b"hmget" => Ok(HMGet::try_from(value)?.into()),
                 b"echo" => Ok(Echo::try_from(value)?.into()),
                 b"sadd" => Ok(SAdd::try_from(value)?.into()),
+                b"sismember" => Ok(SIsMember::try_from(value)?.into()),
                 _ => Err(CommandError::InvalidCommand(format!(
                     "Invalid command: {}",
                     String::from_utf8_lossy(c.as_ref())

@@ -77,11 +77,20 @@ impl Backend {
         map
     }
 
-    pub fn sadd(&self, key: String, field: String) -> i64 {
+    pub fn sadd(&self, key: String, member: String) -> i64 {
         let set = self.set.entry(key).or_default();
-        match set.insert(field, ()) {
+        match set.insert(member, ()) {
             Some(()) => 1,
             None => 0,
         }
+    }
+
+    pub fn is_member(&self, key: String, member: String) -> i64 {
+        if let Some(set) = self.set.get(&key) {
+            if set.get(&member).is_some() {
+                return 1;
+            }
+        }
+        0
     }
 }
