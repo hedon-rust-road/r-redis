@@ -11,6 +11,7 @@ pub struct Backend(Arc<BackendInner>);
 pub struct BackendInner {
     pub(crate) map: DashMap<String, RespFrame>,
     pub(crate) hmap: DashMap<String, DashMap<String, RespFrame>>,
+    pub(crate) set: DashMap<String, DashMap<String, ()>>,
 }
 
 impl Deref for Backend {
@@ -31,6 +32,7 @@ impl Default for BackendInner {
         Self {
             map: DashMap::new(),
             hmap: DashMap::new(),
+            set: DashMap::new(),
         }
     }
 }
@@ -55,7 +57,7 @@ impl Backend {
     }
 
     pub fn hset(&self, key: String, field: String, value: RespFrame) {
-        let hmap = self.hmap.entry(key.to_string()).or_default();
+        let hmap = self.hmap.entry(key).or_default();
         hmap.insert(field, value);
     }
 
@@ -73,5 +75,13 @@ impl Backend {
             }
         }
         map
+    }
+
+    pub fn sadd(&self, key: String, field: String) -> i64 {
+        let set = self.set.entry(key).or_default();
+        match set.insert(field, ()) {
+            Some(()) => 1,
+            None => 0,
+        }
     }
 }

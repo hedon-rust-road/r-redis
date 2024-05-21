@@ -2,6 +2,7 @@ pub mod echo;
 pub mod err;
 pub mod hmap;
 pub mod map;
+pub mod set;
 
 use enum_dispatch::enum_dispatch;
 
@@ -27,6 +28,7 @@ pub enum Command {
     HGetAll(HGetAll),
     HMGet(HMGet),
     Echo(Echo),
+    SAdd(SAdd),
 }
 
 #[derive(Debug)]
@@ -69,6 +71,12 @@ pub struct Echo {
     message: String,
 }
 
+#[derive(Debug)]
+pub struct SAdd {
+    key: String,
+    field: String,
+}
+
 impl TryFrom<RespFrame> for Command {
     type Error = CommandError;
 
@@ -95,6 +103,7 @@ impl TryFrom<RespArray> for Command {
                 b"hgetall" => Ok(HGetAll::try_from(value)?.into()),
                 b"hmget" => Ok(HMGet::try_from(value)?.into()),
                 b"echo" => Ok(Echo::try_from(value)?.into()),
+                b"sadd" => Ok(SAdd::try_from(value)?.into()),
                 _ => Err(CommandError::InvalidCommand(format!(
                     "Invalid command: {}",
                     String::from_utf8_lossy(c.as_ref())
