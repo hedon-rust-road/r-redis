@@ -1,4 +1,4 @@
-use crate::{Backend, RespArray, RespFrame, RespMap, RespNull};
+use crate::{Backend, BulkString, RespArray, RespFrame, RespMap, RespNull};
 
 use super::{
     extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HMGet, HSet,
@@ -55,9 +55,12 @@ impl TryFrom<RespArray> for HGet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field))) => Ok(HGet {
-                key: String::from_utf8(key.1).map_err(CommandError::Utf8Error)?,
-                field: String::from_utf8(field.1).map_err(CommandError::Utf8Error)?,
+            (
+                Some(RespFrame::BulkString(BulkString(Some(key)))),
+                Some(RespFrame::BulkString(BulkString(Some(field)))),
+            ) => Ok(HGet {
+                key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
+                field: String::from_utf8(field).map_err(CommandError::Utf8Error)?,
             }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or field".to_string(),
@@ -73,13 +76,15 @@ impl TryFrom<RespArray> for HSet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field)), Some(value)) => {
-                Ok(HSet {
-                    key: String::from_utf8(key.1).map_err(CommandError::Utf8Error)?,
-                    field: String::from_utf8(field.1).map_err(CommandError::Utf8Error)?,
-                    value,
-                })
-            }
+            (
+                Some(RespFrame::BulkString(BulkString(Some(key)))),
+                Some(RespFrame::BulkString(BulkString(Some(field)))),
+                Some(value),
+            ) => Ok(HSet {
+                key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
+                field: String::from_utf8(field).map_err(CommandError::Utf8Error)?,
+                value,
+            }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key, field or value".to_string(),
             )),
@@ -94,8 +99,8 @@ impl TryFrom<RespArray> for HGetAll {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(key)) => Ok(HGetAll {
-                key: String::from_utf8(key.1).map_err(CommandError::Utf8Error)?,
+            Some(RespFrame::BulkString(BulkString(Some(key)))) => Ok(HGetAll {
+                key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
             }),
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
         }
@@ -115,8 +120,8 @@ impl TryFrom<RespArray> for HMGet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         let key = match args.next() {
-            Some(RespFrame::BulkString(key)) => {
-                String::from_utf8(key.1).map_err(CommandError::Utf8Error)?
+            Some(RespFrame::BulkString(BulkString(Some(key)))) => {
+                String::from_utf8(key).map_err(CommandError::Utf8Error)?
             }
             _ => {
                 return Err(CommandError::InvalidArgument(
@@ -132,9 +137,9 @@ impl TryFrom<RespArray> for HMGet {
 
         for arg in args {
             match arg {
-                RespFrame::BulkString(field) => res
+                RespFrame::BulkString(BulkString(Some(field))) => res
                     .fields
-                    .push(String::from_utf8(field.1).map_err(CommandError::Utf8Error)?),
+                    .push(String::from_utf8(field).map_err(CommandError::Utf8Error)?),
                 _ => {
                     return Err(CommandError::InvalidArgument(
                         "Invalid of lack of field".to_string(),

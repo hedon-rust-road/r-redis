@@ -73,13 +73,13 @@ impl RespDecode for RespFrame {
 
 impl From<&[u8]> for RespFrame {
     fn from(value: &[u8]) -> Self {
-        BulkString(false, value.to_vec()).into()
+        BulkString::new(value).into()
     }
 }
 
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(value: &[u8; N]) -> Self {
-        BulkString(false, value.to_vec()).into()
+        BulkString::new(value).into()
     }
 }
 
@@ -91,7 +91,7 @@ mod tests {
     fn test_resp_frame_decode() -> anyhow::Result<()> {
         let mut buf = BytesMut::from("$-1\r\n");
         let result = RespFrame::decode(&mut buf)?;
-        assert_eq!(result, RespFrame::BulkString(BulkString::new_null()));
+        assert_eq!(result, RespFrame::BulkString(BulkString::null()));
 
         let mut buf = BytesMut::from("$5\r\nhello\r\n");
         let expected_length = RespFrame::expect_length(&buf)?;

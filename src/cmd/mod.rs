@@ -6,7 +6,7 @@ pub mod set;
 
 use enum_dispatch::enum_dispatch;
 
-use crate::{backend, RespArray, RespFrame, SimpleString};
+use crate::{backend, BulkString, RespArray, RespFrame, SimpleString};
 
 use self::err::CommandError;
 
@@ -137,7 +137,7 @@ fn validate_command(
     }
 
     match value[0] {
-        RespFrame::BulkString(ref c) => {
+        RespFrame::BulkString(BulkString(Some(ref c))) => {
             if c.to_ascii_lowercase() != cmd.as_bytes() {
                 return Err(CommandError::InvalidArgument(format!(
                     "Invalid command: expected: {}, got: {}",

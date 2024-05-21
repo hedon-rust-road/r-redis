@@ -1,4 +1,4 @@
-use crate::{Backend, RespArray, RespFrame, RespNull};
+use crate::{Backend, BulkString, RespArray, RespFrame, RespNull};
 
 use super::{extract_args, validate_command, CommandError, CommandExecutor, Get, Set, RESP_OK};
 
@@ -28,7 +28,7 @@ impl TryFrom<RespArray> for Get {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(key)) => Ok(Get {
+            Some(RespFrame::BulkString(BulkString(Some(key)))) => Ok(Get {
                 key: String::from_utf8(key.to_vec())
                     .map_err(|e| CommandError::InvalidArgument(format!("invalid utf8: {}", e)))?,
             }),
@@ -46,8 +46,11 @@ impl TryFrom<RespArray> for Set {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(value))) => Ok(Set {
-                key: String::from_utf8(key.1).map_err(CommandError::Utf8Error)?,
+            (
+                Some(RespFrame::BulkString(BulkString(Some(key)))),
+                Some(RespFrame::BulkString(value)),
+            ) => Ok(Set {
+                key: String::from_utf8(key).map_err(CommandError::Utf8Error)?,
                 value: value.into(),
             }),
             _ => Err(CommandError::InvalidArgument(
