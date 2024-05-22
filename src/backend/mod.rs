@@ -1,4 +1,4 @@
-use std::{ops::Deref, sync::Arc};
+use std::{collections::HashSet, ops::Deref, sync::Arc};
 
 use dashmap::{DashMap, DashSet};
 
@@ -77,13 +77,15 @@ impl Backend {
         map
     }
 
-    pub fn sadd(&self, key: String, member: BulkString) -> i64 {
+    pub fn sadd(&self, key: String, member: HashSet<BulkString>) -> i64 {
+        let mut res = 0;
         let set = self.set.entry(key).or_default();
-        if set.insert(member) {
-            0
-        } else {
-            1
+        for k in member {
+            if set.insert(k) {
+                res += 1
+            }
         }
+        res
     }
 
     pub fn is_member(&self, key: String, member: BulkString) -> i64 {

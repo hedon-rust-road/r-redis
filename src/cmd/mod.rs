@@ -4,6 +4,8 @@ pub mod hmap;
 pub mod map;
 pub mod set;
 
+use std::collections::HashSet;
+
 use enum_dispatch::enum_dispatch;
 
 use crate::{backend, BulkString, RespArray, RespFrame, SimpleString};
@@ -75,7 +77,7 @@ pub struct Echo {
 #[derive(Debug)]
 pub struct SAdd {
     key: String,
-    member: BulkString,
+    member: HashSet<BulkString>,
 }
 
 #[derive(Debug)]
