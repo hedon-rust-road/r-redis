@@ -84,6 +84,12 @@ impl Deref for RespArray {
     }
 }
 
+impl From<Vec<RespFrame>> for RespArray {
+    fn from(value: Vec<RespFrame>) -> Self {
+        RespArray(Some(value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{simple_error::SimpleError, simple_string::SimpleString};
