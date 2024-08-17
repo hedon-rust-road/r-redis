@@ -1,6 +1,9 @@
+use std::num::NonZeroUsize;
+
 use winnow::{
     combinator::{dispatch, fail, terminated},
-    token::{any, take, take_until},
+    error::{ErrMode, Needed},
+    token::{any, take_until},
     PResult, Parser,
 };
 
@@ -61,9 +64,19 @@ fn bulk_string_len(input: &mut &[u8]) -> PResult<()> {
     } else if len < -1 {
         return Err(cut_err("bulk string length must >= -1"));
     }
-    terminated(take(len as usize), CRLF)
-        .value(())
-        .parse_next(input)
+    // terminated(take(len as usize), CRLF)
+    //     .value(())
+    //     .parse_next(input)
+
+    // just skip the data and do not parse it.
+    // because we just need the length of the data.
+    let len_with_crlf = len as usize + 2;
+    if input.len() < len_with_crlf {
+        let size = NonZeroUsize::new((len_with_crlf - input.len()) as usize).unwrap();
+        return Err(ErrMode::Incomplete(Needed::Size(size)));
+    }
+    *input = &input[(len + 2) as usize..];
+    Ok(())
 }
 
 fn map_len(input: &mut &[u8]) -> PResult<()> {

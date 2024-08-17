@@ -92,8 +92,8 @@ fn null(input: &mut &[u8]) -> PResult<RespNull> {
 
 // #<t|f>\r\n
 fn boolean(input: &mut &[u8]) -> PResult<bool> {
-    let b = alt(('t', 'f')).parse_next(input)?;
-    Ok(b == 't')
+    let b = alt(("t\r\n", "f\r\n")).parse_next(input)?;
+    Ok(b[0] == b't')
 }
 
 fn double(input: &mut &[u8]) -> PResult<f64> {

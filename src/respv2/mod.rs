@@ -1,11 +1,10 @@
 mod parser;
 mod parser_len;
 
-use bytes::BytesMut;
-use parser::parse_frame;
-use parser_len::parse_frame_length;
-
+pub use self::parser::parse_frame;
+pub use self::parser_len::parse_frame_length;
 use crate::{err::RespError, RespFrame};
+use bytes::BytesMut;
 
 pub trait RespDecodeV2: Sized {
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
@@ -72,6 +71,13 @@ mod tests {
         let mut buf = BytesMut::from(":1000\r\n");
         let frame = RespFrame::decode(&mut buf).unwrap();
         assert_eq!(frame, RespFrame::Integer(1000));
+    }
+
+    #[test]
+    fn respv2_boolean_should_work() {
+        let mut buf = BytesMut::from("#t\r\n");
+        let frame = RespFrame::decode(&mut buf).unwrap();
+        assert_eq!(frame, RespFrame::Boolean(true));
     }
 
     #[test]
