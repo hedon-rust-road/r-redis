@@ -3,7 +3,7 @@ use bytes::BytesMut;
 use crate::{err::RespError, extract_simple_frame_data, RespDecode, RespEncode, CRLF_LEN};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(String);
+pub struct SimpleError(pub(crate) String);
 
 impl RespDecode for SimpleError {
     const PREFIX: &'static str = "-";

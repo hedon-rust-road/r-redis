@@ -8,7 +8,7 @@ use tokio_util::codec::{Decoder, Encoder, Framed};
 use crate::{
     cmd::{Command, CommandExecutor},
     err::RespError,
-    Backend, RespDecode, RespEncode, RespFrame,
+    Backend, RespDecodeV2, RespEncode, RespFrame,
 };
 
 struct RespFrameCodec;

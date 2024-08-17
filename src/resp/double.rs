@@ -56,8 +56,6 @@ impl RespDecode for f64 {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::{INFINITY, NAN, NEG_INFINITY};
-
     use crate::resp_frame::RespFrame;
 
     use super::*;
@@ -76,11 +74,11 @@ mod tests {
         assert_eq!(frame.encode(), b",1.22e-10\r\n");
         let frame: RespFrame = (1.22e+10).into();
         assert_eq!(frame.encode(), b",1.22e10\r\n");
-        let frame: RespFrame = (INFINITY).into();
+        let frame: RespFrame = (f64::INFINITY).into();
         assert_eq!(frame.encode(), b",inf\r\n");
-        let frame: RespFrame = (-INFINITY).into();
+        let frame: RespFrame = (-f64::INFINITY).into();
         assert_eq!(frame.encode(), b",-inf\r\n");
-        let frame: RespFrame = (NAN).into();
+        let frame: RespFrame = (f64::NAN).into();
         assert_eq!(frame.encode(), b",nan\r\n");
     }
 
@@ -96,11 +94,11 @@ mod tests {
 
         let mut buf = BytesMut::from(",inf\r\n");
         let result = f64::decode(&mut buf)?;
-        assert_eq!(result, INFINITY);
+        assert_eq!(result, f64::INFINITY);
 
         let mut buf = BytesMut::from(",-inf\r\n");
         let result = f64::decode(&mut buf)?;
-        assert_eq!(result, NEG_INFINITY);
+        assert_eq!(result, f64::NEG_INFINITY);
 
         let mut buf = BytesMut::from(",nan\r\n");
         let result = f64::decode(&mut buf)?;
